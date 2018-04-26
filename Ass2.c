@@ -11,6 +11,7 @@ By Paul Vavich 11685726
 #include <sys/types.h>
 #include <string.h>
 #include <time.h>
+#include <sys/shm.h>
 
 //Array for pipe
 int fd[2];
@@ -29,6 +30,11 @@ char header_end[] = "end_header\n";
 
 //NOTE: This is the maximum size per line of the input File
 #define MAX_BUF 50
+
+//SHMSZ - for shared memory
+#define SHMSZ 1024
+int shmid;
+char *shm, *s;
 
 //struct to pass to each thread
 struct Parser
@@ -58,6 +64,20 @@ int main(int argc, char*argv[])
 	//Declare struct
 	struct Parser thread_data;
   	
+	//Declare key for Shared Memory
+	key_t key = 5678;
+	if ((shmid = shmget(key, SHMSZ, IPC_CREAT | 0666)) < 0) 
+	{
+        	perror("shmget"); 
+    	}
+	
+	if ((shm = shmat(shmid, NULL, 0)) == (char *) -1) 
+	{
+        	perror("shmat");
+        }
+
+	
+
 	//Add Files to struct
 	thread_data.inputF = fopen(argv[1], "r");
 	thread_data.outputF = fopen(argv[2], "w");
@@ -83,6 +103,7 @@ int main(int argc, char*argv[])
 	clock_t end = clock();
 	double time_spent = (double)(end-begin)/CLOCKS_PER_SEC;
 	printf("Complete! Runtime: %lf seconds\n", time_spent);	
+	*shm = time_spent;
 }
 
 void *A(void *args)
