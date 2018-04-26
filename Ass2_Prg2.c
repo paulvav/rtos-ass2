@@ -4,11 +4,11 @@
 #include <stdio.h>
 #include <string.h>
 
-#define SHMSZ 27
+#define SHMSZ 8192
 
 int shmid;
-key_t key = 5678;
-char *shm, *s;
+key_t key = 6000;
+double *shm, *s;
 
 
 main()
@@ -20,11 +20,11 @@ main()
   
   	}
 
-	if ((shm = shmat(shmid, NULL, 0)) == (char *) -1) 
+	if ((shm = shmat(shmid, NULL, 0)) == (double *)-1) 
 	{
         	perror("shmat");
     	}
 	
 	s=shm;
-	printf("%s\n", s);
+	printf("Last Runtime was: %f seconds\n", *shm);
 }

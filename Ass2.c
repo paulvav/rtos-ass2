@@ -32,9 +32,9 @@ char header_end[] = "end_header\n";
 #define MAX_BUF 50
 
 //SHMSZ - for shared memory
-#define SHMSZ 1024
+#define SHMSZ 8192
 int shmid;
-char *shm, *s;
+double *shm;
 
 //struct to pass to each thread
 struct Parser
@@ -65,13 +65,13 @@ int main(int argc, char*argv[])
 	struct Parser thread_data;
   	
 	//Declare key for Shared Memory
-	key_t key = 5678;
+	key_t key = 6000;
 	if ((shmid = shmget(key, SHMSZ, IPC_CREAT | 0666)) < 0) 
 	{
         	perror("shmget"); 
     	}
 	
-	if ((shm = shmat(shmid, NULL, 0)) == (char *) -1) 
+	if ((shm = shmat(shmid, NULL, 0)) == (double *) -1) 
 	{
         	perror("shmat");
         }
@@ -102,7 +102,7 @@ int main(int argc, char*argv[])
 
 	clock_t end = clock();
 	double time_spent = (double)(end-begin)/CLOCKS_PER_SEC;
-	printf("Complete! Runtime: %lf seconds\n", time_spent);	
+	printf("Complete! Runtime: %lf seconds\n", time_spent);
 	*shm = time_spent;
 }
 
