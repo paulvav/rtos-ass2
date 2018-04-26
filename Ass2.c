@@ -79,17 +79,10 @@ int main(int argc, char*argv[])
 
 	//wait for thread A to end	
 	pthread_join(tid1,NULL);
-	int i = 0;
-	while(i < 100000000)
-	{
-	i++;
-	}
 
 	clock_t end = clock();
 	double time_spent = (double)(end-begin)/CLOCKS_PER_SEC;
-	printf("End time %lf", (double)end);
-	
-	
+	printf("Complete! Runtime: %lf seconds\n", time_spent);	
 }
 
 void *A(void *args)
@@ -121,7 +114,6 @@ void *A(void *args)
 	//clost other threads 
 	pthread_cancel(tid2);
 	pthread_cancel(tid3);
-	printf("A:%f", (double)clock());
 }
 
 /*The thread will begin control in this function*/
