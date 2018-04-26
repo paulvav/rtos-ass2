@@ -1,161 +1,173 @@
+/*
+RTOS assignment 2 - UTS
+Program to read from user specified Input file and Write to user specified Output file.
+The purpose of this program is to demonstrate the functionality of Threads and Semaphores in C.
+By Paul Vavich 11685726
+*/
+
 #include <stdio.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <sys/types.h>
 #include <string.h>
+#include <time.h>
 
-
-int sum;/*this data is shared by the threads*/
-/* The mutex lock */
+//Array for pipe
 int fd[2];
-pthread_mutex_t mutex;
-/* the semaphores */
-sem_t one, two, sread, swrite, justify;
-pthread_t tid1,tid2, tid3;       //Thread ID
-pthread_attr_t attr; //Set of thread attributes
 
-void *A(void *param);/*threads call this function*/
-void *B(void *param);/*threads call this function*/
-void *C(void *param);
+/*Declaring three semaphores */
+sem_t sread, swrite, sjustify;
 
-void initializeData();
-FILE * file;
+//Thread ID
+pthread_t tid1,tid2, tid3;
 
+//Set of thread attributes			
+pthread_attr_t attr;				
+
+//Keyword indicating end of header, eg. when document will start writing
+char header_end[] = "end_header\n";    
+
+//NOTE: This is the maximum size per line of the input File
 #define MAX_BUF 50
-char buf[MAX_BUF];
 
+//struct to pass to each thread
+struct Parser
+{
+	char buf[MAX_BUF];
+	FILE * inputF;
+	FILE * outputF;
 
+} thread_data;
+
+void *A(void *args);/*threads call this function*/
+void *B(void *args);/*threads call this function*/
+void *C(void *args);/*threads call this function*/
 
 int main(int argc, char*argv[])
 {
- // pthread_t tid;/*the thread identifier*/
- // pthread_attr_t attr;/*set of thread attributes*/
+	//Find Start time to calculate run time
+        clock_t begin = clock();
+	
+	//Argument checker - User must input two file names
+	if(argc!=3)
+	{
+		fprintf(stderr,"Usage: Inputfile OutPutfile");
+		return -1;
+	}
 
-  if(argc!=2){
-	fprintf(stderr,"usage: a.out <integer value>\n");
-	return -1;
-  }
-  if(atoi(argv[1])<0){
-	fprintf(stderr,"%d must be >=0\n",atoi(argv[1]));
-	return -1;
-  }
-  initializeData();
+	//Declare struct
+	struct Parser thread_data;
+  	
+	//Add Files to struct
+	thread_data.inputF = fopen(argv[1], "r");
+	thread_data.outputF = fopen(argv[2], "w");
+    
+     	/* Get the default attributes */
+	pthread_attr_init(&attr);
+
+   	//Initialise Pipe
+	if (pipe(fd) == -1)
+   		printf("PIPE-ERROR");
  
-  /*get the default attributes*/
-  pthread_attr_init(&attr);
+  	/*get the default attributes*/
+	pthread_attr_init(&attr);
   
-  /*create the thread 1*/
-  pthread_create(&tid1,&attr,A,argv[1]);
-  
-  printf("sum=%d\n",sum);
+  	/*create the threads */
+	pthread_create(&tid1,&attr,A,(void *)&thread_data);
+	pthread_create(&tid2,&attr,B,(void *)&thread_data);  
+	pthread_create(&tid3,&attr,C,(void *)&thread_data);
 
-  /*create the thread 2*/
-  // add your program 
-  pthread_create(&tid2,&attr,B,argv[1]);  
-  pthread_create(&tid3,&attr,C,argv[1]);
-  
-  /*send semaphore to thread 2 and begin the threads running*/
-  sem_post(&one);
-  /*wait for the thread to exit*/
-  // add your program 
-  pthread_join(tid1,NULL);
-  pthread_join(tid2,NULL);  
-  pthread_join(tid2,NULL);  
-  printf("sum=%d\n",sum);
+	//wait for thread A to end	
+	pthread_join(tid1,NULL);
+	int i = 0;
+	while(i < 100000000)
+	{
+	i++;
+	}
 
+	clock_t end = time();
+	double time_spent = (double)(end-begin)/CLOCKS_PER_SEC;
+	printf("End time %lf", (double)end);
+	
+	
+}
+
+void *A(void *args)
+{
+	//String to hold contents of file
+	char lineFromFile[100];
+	
+	//Declaring local pointer of struct
+	struct Parser *tdata = (struct Parser *) args;
+  	
+	//For every line in input file...
+	while(fgets(lineFromFile,1000,tdata->inputF))
+	{
+		//write line of file into the pipe
+		if(write(fd[1], lineFromFile, strlen(lineFromFile)+1) != strlen(lineFromFile)+1)
+			printf("Pipe Error: Write Failed");
+		
+		//send semaphore that pipe is ready to be read	  	
+		sem_post(&sread);
+		
+		//wait until next threads are ready
+	  	sem_wait(&swrite);  
+	}
+	//input file has been completey read	
+	
+	//close output file
+	fclose(tdata->outputF);
+
+	//clost other threads 
+	pthread_cancel(tid2);
+	pthread_cancel(tid3);
+	printf("A:%f", (double)clock());
 }
 
 /*The thread will begin control in this function*/
-void *A(void *param)
+void *B(void *args)
 {
-  //close(fd[0]);
-  char str[100];
-  file = fopen("data_file.txt", "r");
-  
-
-  while(fgets(str,1000, file)){
-  //printf("%s",str);
-  //printf("size of string: %i\n", strlen(str));
-  if(strlen(str) > 0) 
-  { 
-  		write(fd[1], str, strlen(str)+1);
-  		sem_post(&sread);
-  		sem_wait(&swrite);  
-  }
-  }
-  printf("Thread1 Flag"); 
-  
-  pthread_mutex_lock(&mutex);
- 
-  /* release the mutex lock */
-  pthread_mutex_unlock(&mutex); 
-  
-
-  /* send semaphore to thread 2*/
-  sem_post(&two);
-  
-
-}
-
-/*The thread will begin control in this function*/
-void *B(void *param)
-{
-
-  int n;
-  
-  while(1)
-  {
-   //close(fd[1]);
+	//Declaring local pointer of struct
+	struct Parser *tdata = (struct Parser *) args;
+	
+	while(1)
+	{	//wait for Thread A to put data in pipe
   		sem_wait(&sread);
- 
-  		n = read(fd[0], buf, MAX_BUF);
-  		if(strlen(buf)>0)
-  			{
-  				printf("Recieved: %s\n", buf);
-  			}
-  //		printf("Size of N: %i\n",n);
 
-  	//	printf("thread two\n");
-	  /* release the mutex lock */
-	  // add your program 
-	 
-	  sem_post(&swrite);   
+		//Read Data from pipe
+		if(read(fd[0], tdata->buf, MAX_BUF) < 0)
+			printf("Pipe Error: Read Failed");
+		//Semaphore to start next thread
+		sem_post(&sjustify); 	 
 	}
 }
 
-void *C(void *param)
+void *C(void *args)
 {
+	//Declaring local pointer of struct
+	struct Parser *tdata = (struct Parser *) args;
+	
+	//Flag indicating if the header has been detected as over	
+	int found_header = 0; 
 	 
-	   while(1)
-	   {
-	   //sem_wait(&swrite);
-	   FILE* dataf = fopen("data.txt", "w");
- 		fprintf(dataf,"balls");
- 		}
- 		
-      fclose(dataf);
+	while(1)
+	{	
+		//wait for thread B to send complete signal
+		sem_wait(&sjustify);
 
+		//Write to file only if the end header has been passed
+     		if(found_header)		
+			//Write to file
+       			fprintf(tdata->outputF,tdata->buf);
+      
+		//If End header has been found
+   		if(!strcmp(tdata->buf,header_end))	
+			//set header flag       			
+			found_header = 1;
+
+       		//Send signal that write is done for Thread A
+		sem_post(&swrite);
+      	}
 }
 
-void initializeData() {
-   sum=0;
-   
-   /* Create the mutex lock */
-   pthread_mutex_init(&mutex, NULL);
-
-   /* Create the one semaphore and initialize to 0 */
-   sem_init(&one, 0, 0);
-
-   /* Create the two semaphore and initialize to BUFFER_SIZE */
-   sem_init(&two, 0, 0);
-
-   /* Get the default attributes */
-   pthread_attr_init(&attr);
-
-   //Initialise Pipe
-
-   if (pipe(fd) == -1)
-   	printf("PIPE-ERROR");
-
-}
 
