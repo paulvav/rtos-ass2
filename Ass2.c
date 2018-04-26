@@ -85,7 +85,7 @@ int main(int argc, char*argv[])
 	i++;
 	}
 
-	clock_t end = time();
+	clock_t end = clock();
 	double time_spent = (double)(end-begin)/CLOCKS_PER_SEC;
 	printf("End time %lf", (double)end);
 	
@@ -158,7 +158,7 @@ void *C(void *args)
 		//Write to file only if the end header has been passed
      		if(found_header)		
 			//Write to file
-       			fprintf(tdata->outputF,tdata->buf);
+       			fprintf(tdata->outputF,"%s", tdata->buf);
       
 		//If End header has been found
    		if(!strcmp(tdata->buf,header_end))	
