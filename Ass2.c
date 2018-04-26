@@ -12,6 +12,9 @@ By Paul Vavich 11685726
 #include <string.h>
 #include <time.h>
 #include <sys/shm.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 //Array for pipe
 int fd[2];
@@ -33,8 +36,8 @@ char header_end[] = "end_header\n";
 
 //SHMSZ - for shared memory
 #define SHMSZ 8192
-int shmid;
-double *shm;
+
+#define MEM_NAME "shared"
 
 //struct to pass to each thread
 struct Parser
@@ -62,22 +65,16 @@ int main(int argc, char*argv[])
 	}
 
 	//Declare struct
-	struct Parser thread_data;
-  	
-	//Declare key for Shared Memory
-	key_t key = 6000;
-	if ((shmid = shmget(key, SHMSZ, IPC_CREAT | 0666)) < 0) 
-	{
-        	perror("shmget"); 
-    	}
+ 	struct Parser thread_data;
+         	
+   	//Declare key for Shared Memory
+	int shm_fd;
+	double* shm;
+	shm_fd = shm_open(MEM_NAME, O_CREAT | O_RDWR, 0666);
 	
-	if ((shm = shmat(shmid, NULL, 0)) == (double *) -1) 
-	{
-        	perror("shmat");
-        }
+	ftruncate(shm_fd, SHMSZ);
 
-	
-
+	shm = mmap(0,SHMSZ, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 	//Add Files to struct
 	thread_data.inputF = fopen(argv[1], "r");
 	thread_data.outputF = fopen(argv[2], "w");
@@ -102,8 +99,10 @@ int main(int argc, char*argv[])
 
 	clock_t end = clock();
 	double time_spent = (double)(end-begin)/CLOCKS_PER_SEC;
-	printf("Complete! Runtime: %lf seconds\n", time_spent);
+
 	*shm = time_spent;
+
+	printf("Complete! Runtime time sent to memory location %s", MEM_NAME);
 }
 
 void *A(void *args)
