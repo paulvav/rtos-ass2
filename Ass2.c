@@ -67,14 +67,21 @@ int main(int argc, char*argv[])
 	//Declare struct
  	struct Parser thread_data;
          	
-   	//Declare key for Shared Memory
-	int shm_fd;
-	double* shm;
-	shm_fd = shm_open(MEM_NAME, O_CREAT | O_RDWR, 0666);
+   	//Declare id for Shared Memory
+	int shm_id;
 	
-	ftruncate(shm_fd, SHMSZ);
+	//Declare shm pointer to store value
+	double* shm;
 
-	shm = mmap(0,SHMSZ, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+	//Initilise shraed memory
+	shm_id = shm_open(MEM_NAME, O_CREAT | O_RDWR, 0666);
+
+	//Setting shared memory size
+	ftruncate(shm_id, SHMSZ);
+
+	//Assigning pointer for value of shared memory
+	shm = mmap(0,SHMSZ, PROT_READ | PROT_WRITE, MAP_SHARED, shm_id, 0);
+
 	//Add Files to struct
 	thread_data.inputF = fopen(argv[1], "r");
 	thread_data.outputF = fopen(argv[2], "w");
@@ -102,7 +109,7 @@ int main(int argc, char*argv[])
 
 	*shm = time_spent;
 
-	printf("Complete! Runtime time sent to memory location %s", MEM_NAME);
+	printf("Complete! Runtime time sent to memory location '%s' \n", MEM_NAME);
 }
 
 void *A(void *args)
